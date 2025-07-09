@@ -110,6 +110,8 @@ def return_transaction(transaction_id: UUID, db: Session) -> TransactionGet:
             logger.warning(f"Transaction not found: {transaction_id}")
             raise HTTPException(status_code=404, detail="Transaction not found")
         return TransactionGet.model_validate(transaction)
+    except HTTPException:
+        raise
     except (DataError, IntegrityError, OperationalError) as e:
         logger.error(f"Database error in return_transaction: {type(e).__name__}: {e}")
         raise HTTPException(

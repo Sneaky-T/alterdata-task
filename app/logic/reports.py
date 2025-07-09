@@ -44,10 +44,12 @@ def return_customer_summary(
             )
 
         result = customer_summary.first()
-        if not result:
+        if not result or any(value is None for value in result):
             logger.warning(f"Customer not found: {customer_id}")
             raise HTTPException(status_code=404, detail="Customer not found.")
         return CustomerSummaryGet.model_validate(result)
+    except HTTPException:
+        raise
     except (DataError, IntegrityError, OperationalError) as e:
         logger.error(
             f"Database error in return_customer_summary: {type(e).__name__}: {e}"
@@ -85,10 +87,12 @@ def return_product_summary(
             product_summary = product_summary.filter(Transaction.timestamp <= end_date)
 
         result = product_summary.first()
-        if not result:
+        if not result or any(value is None for value in result):
             logger.warning(f"Product not found: {product_id}")
             raise HTTPException(status_code=404, detail="Product not found.")
         return ProductSummaryGet.model_validate(result)
+    except HTTPException:
+        raise
     except (DataError, IntegrityError, OperationalError) as e:
         logger.error(
             f"Database error in return_product_summary: {type(e).__name__}: {e}"

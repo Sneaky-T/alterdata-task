@@ -77,6 +77,29 @@ class TestTransactionsEndpoints:
         for transaction in data:
             assert len(transaction) == 8
 
+    def test_list_transactions_with_filters(self, client: TestClient) -> None:
+        response = client.get(
+            "/transactions?customer_id=22222222-2222-2222-2222-222222222222"
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert all(
+            transaction["customer_id"] == "22222222-2222-2222-2222-222222222222"
+            for transaction in data
+        )
+
+        response = client.get(
+            "/transactions?product_id=33333333-3333-3333-3333-333333333333"
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert all(
+            transaction["product_id"] == "33333333-3333-3333-3333-333333333333"
+            for transaction in data
+        )
+
     def test_transaction_detail(self, client: TestClient) -> None:
         transaction_id = "11111111-1111-1111-1111-111111111111"
 
