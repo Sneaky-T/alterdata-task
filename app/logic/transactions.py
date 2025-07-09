@@ -49,9 +49,9 @@ def process_transactions(csv_file_tmp_path: str) -> None:
                         f"Row {rows_processed}: {type(e).__name__}: {e} | {row}"
                     )
 
-            csv_logger.info(
-                f"Processed {rows_processed} rows, {rows_failed} rows failed."
-            )
+            message = f"Processed {rows_processed} rows, {rows_failed} rows failed."
+            csv_logger.info(message)
+            logging.info(message)
     finally:
         try:
             os.remove(csv_file_tmp_path)

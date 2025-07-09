@@ -15,7 +15,7 @@ class Transaction(BaseModel):
     transaction_id: UUID
     customer_id: UUID
     product_id: UUID
-    amount: Annotated[float, condecimal(max_digits=10, decimal_places=2)]
+    amount: Annotated[float, condecimal(max_digits=13, decimal_places=2)]
     currency: CurrencyEnum
     quantity: Annotated[int, conint(gt=0)]
     timestamp: datetime
