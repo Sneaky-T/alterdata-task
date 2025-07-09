@@ -108,10 +108,8 @@ class TestCsvUpload:
 class TestCustomerSummaryEndpoints:
     def test_customer_summary(self, client):
         customer_id = "22222222-2222-2222-2222-222222222222"
-
-        response = client.get(f"/customer-summary/{customer_id}")
+        response = client.get(f"/reports/customer-summary/{customer_id}")
         assert response.status_code == 200
-
         data = response.json()
         assert Decimal(data["total_amount_in_PLN"]) == Decimal("5400.00")
         assert data["unique_product_count"] == 4
@@ -119,13 +117,37 @@ class TestCustomerSummaryEndpoints:
 
     def test_customer_summary_with_date_limits(self, client):
         customer_id = "22222222-2222-2222-2222-222222222222"
-
         response = client.get(
-            f"/customer-summary/{customer_id}?end_date=2024-01-04T23:59:59"
+            f"/reports/customer-summary/{customer_id}?end_date=2024-01-04T23:59:59"
         )
         assert response.status_code == 200
-
         data = response.json()
         assert Decimal(data["total_amount_in_PLN"]) == Decimal("2000.00")
         assert data["unique_product_count"] == 2
         assert data["last_transaction_date"] == "2024-01-04T00:00:00"
+
+
+class TestProductSummaryEndpoints:
+    def test_product_summary(self, client):
+        product_id = "33333333-3333-3333-3333-333333333333"
+
+        response = client.get(f"/reports/product-summary/{product_id}")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["total_quantity"] == 8
+        assert Decimal(data["total_amount_in_PLN"]) == Decimal("3410.00")
+        assert data["unique_customer_count"] == 3
+
+    def test_product_summary_with_date_limits(self, client):
+        product_id = "33333333-3333-3333-3333-333333333333"
+
+        response = client.get(
+            f"/reports/product-summary/{product_id}?end_date=2024-01-02T23:59:59"
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["total_quantity"] == 3
+        assert Decimal(data["total_amount_in_PLN"]) == Decimal("1260.00")
+        assert data["unique_customer_count"] == 2

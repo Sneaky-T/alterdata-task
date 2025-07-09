@@ -1,8 +1,7 @@
 from fastapi import FastAPI
 from app.api.transactions import transactions_router
-from app.api.customer_summary import customer_summary_router
+from app.api.reports import reports_router
 from app.utils.log_utils import setup_logging
-
 
 setup_logging()
 
@@ -15,4 +14,4 @@ def root() -> dict[str, str]:
 
 
 app.include_router(transactions_router)
-app.include_router(customer_summary_router)
+app.include_router(reports_router)
