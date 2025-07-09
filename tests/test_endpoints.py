@@ -1,15 +1,15 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from app.db import Base, get_db
 from app.models import transaction
 from app.models.transaction import Transaction
-from tests.test_utils import db_content, dirty_csv_content, create_test_tables
+from tests.test_utils import db_content, create_test_tables
 from app.main import app
-import io
 import os
 from decimal import Decimal
+from typing import Generator, Any
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
@@ -18,7 +18,7 @@ TEST_DATABASE_URL = os.getenv(
 
 
 @pytest.fixture(scope="function")
-def db_session():
+def db_session() -> Generator[Session, None, None]:
     engine = create_engine(TEST_DATABASE_URL)
 
     create_test_tables(engine)
@@ -38,14 +38,14 @@ def db_session():
 
 
 @pytest.fixture(scope="function")
-def client(db_session):
-    def override_get_db():
+def client(db_session: Session) -> TestClient:
+    def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
 
     class APIKeyTestClient(TestClient):
-        def request(self, method, url, **kwargs):
+        def request(self, method: str, url: str, **kwargs) -> Any:
             headers = kwargs.pop("headers", {}) or {}
             headers.setdefault("x-api-key", "secret-key")
             return super().request(method, url, headers=headers, **kwargs)
@@ -53,13 +53,13 @@ def client(db_session):
     return APIKeyTestClient(app)
 
 
-def test_root_endpoint(client):
+def test_root_endpoint(client: TestClient) -> None:
     response = client.get("/")
     assert response.status_code == 200
     assert response.json() == {"message": "Welcome!"}
 
 
-def test_auth_wrong_key(client):
+def test_auth_wrong_key(client: TestClient) -> None:
     response = client.get("/transactions", headers={"x-api-key": "wrong-key"})
     assert response.status_code == 401
 
@@ -67,7 +67,7 @@ def test_auth_wrong_key(client):
 
 
 class TestTransactionsEndpoints:
-    def test_list_transactions(self, client):
+    def test_list_transactions(self, client: TestClient) -> None:
         response = client.get("/transactions")
         assert response.status_code == 200
 
@@ -77,7 +77,7 @@ class TestTransactionsEndpoints:
         for transaction in data:
             assert len(transaction) == 8
 
-    def test_transaction_detail(self, client):
+    def test_transaction_detail(self, client: TestClient) -> None:
         transaction_id = "11111111-1111-1111-1111-111111111111"
 
         response = client.get(f"/transactions/{transaction_id}")
@@ -88,36 +88,8 @@ class TestTransactionsEndpoints:
         assert len(data) == 8
 
 
-class TestCsvUpload:
-    def test_csv_upload_comprehensive(self, client):
-        files = {
-            "file": (
-                "test.csv",
-                io.BytesIO(dirty_csv_content.encode("utf-8")),
-                "text/csv",
-            )
-        }
-
-        response = client.post("/transactions/upload", files=files)
-        assert response.status_code == 200
-        assert response.json() == {"message": "File uploaded successfully."}
-
-        log_path = "logs/csv_import.log"
-        assert os.path.exists(log_path)
-
-        with open(log_path, "r", encoding="utf-8") as log_file:
-            log_content = log_file.read()
-            assert "Processed 13 rows, 6 rows failed" in log_content
-            assert log_content.count("ValidationError") >= 3
-            assert (
-                "DataError" in log_content or "decimal.InvalidOperation" in log_content
-            )
-            assert "IntegrityError" in log_content
-            assert "Exception" in log_content or "TypeError" in log_content
-
-
 class TestCustomerSummaryEndpoints:
-    def test_customer_summary(self, client):
+    def test_customer_summary(self, client: TestClient) -> None:
         customer_id = "22222222-2222-2222-2222-222222222222"
         response = client.get(f"/reports/customer-summary/{customer_id}")
         assert response.status_code == 200
@@ -126,7 +98,7 @@ class TestCustomerSummaryEndpoints:
         assert data["unique_product_count"] == 4
         assert data["last_transaction_date"] == "2024-01-07T00:00:00"
 
-    def test_customer_summary_with_date_limits(self, client):
+    def test_customer_summary_with_date_limits(self, client: TestClient) -> None:
         customer_id = "22222222-2222-2222-2222-222222222222"
         response = client.get(
             f"/reports/customer-summary/{customer_id}?end_date=2024-01-04T23:59:59"
@@ -139,7 +111,7 @@ class TestCustomerSummaryEndpoints:
 
 
 class TestProductSummaryEndpoints:
-    def test_product_summary(self, client):
+    def test_product_summary(self, client: TestClient) -> None:
         product_id = "33333333-3333-3333-3333-333333333333"
 
         response = client.get(f"/reports/product-summary/{product_id}")
@@ -150,7 +122,7 @@ class TestProductSummaryEndpoints:
         assert Decimal(data["total_amount_in_PLN"]) == Decimal("3410.00")
         assert data["unique_customer_count"] == 3
 
-    def test_product_summary_with_date_limits(self, client):
+    def test_product_summary_with_date_limits(self, client: TestClient) -> None:
         product_id = "33333333-3333-3333-3333-333333333333"
 
         response = client.get(

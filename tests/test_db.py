@@ -3,7 +3,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy import text
 
 
-def test_database_connection():
+def test_database_connection() -> None:
     try:
         with engine.connect() as connection:
             result = connection.execute(text("SELECT 1;"))

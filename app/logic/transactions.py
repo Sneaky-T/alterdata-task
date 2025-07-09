@@ -12,12 +12,7 @@ from app.db import Session
 from app.schemas.transaction import TransactionGet
 from fastapi import HTTPException
 
-csv_handler = logging.FileHandler("logs/csv_import.log")
-csv_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
-csv_logger = logging.getLogger("csv_logger")
-csv_logger.propagate = False
-csv_logger.addHandler(csv_handler)
-csv_logger.setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def process_transactions(csv_file_tmp_path: str) -> None:
@@ -42,22 +37,30 @@ def process_transactions(csv_file_tmp_path: str) -> None:
                     DataError,
                     IntegrityError,
                     OperationalError,
-                    Exception,
                 ) as e:
                     rows_failed += 1
-                    csv_logger.error(
+                    logger.error(
                         f"Row {rows_processed}: {type(e).__name__}: {e} | {row}"
+                    )
+                except Exception as e:
+                    logger.exception(f"Unexpected error in process_transactions: {e}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Unexpected error: {type(e).__name__}: {e}",
                     )
 
             message = f"Processed {rows_processed} rows, {rows_failed} rows failed."
-            csv_logger.info(message)
-            logging.info(message)
+            logger.info(message)
     finally:
         try:
             os.remove(csv_file_tmp_path)
-        except Exception as cleanup_err:
-            csv_logger.error(
+        except OSError as cleanup_err:
+            logger.error(
                 f"Failed to remove temp file {csv_file_tmp_path}: {cleanup_err}"
+            )
+        except Exception as cleanup_err:
+            logger.error(
+                f"Unexpected error during temp file cleanup: {type(cleanup_err).__name__}: {cleanup_err}"
             )
 
 
@@ -68,25 +71,52 @@ def list_transactions(
     product_id: Optional[UUID],
     db: Session,
 ) -> list[TransactionGet]:
-    query = db.query(Transaction)
-    if customer_id:
-        query = query.filter(Transaction.customer_id == customer_id)
-    if product_id:
-        query = query.filter(Transaction.product_id == product_id)
-    transactions_list = (
-        query.order_by(Transaction.timestamp.desc()).offset(offset).limit(limit).all()
-    )
-    return [
-        TransactionGet.model_validate(transaction) for transaction in transactions_list
-    ]
+    try:
+        query = db.query(Transaction)
+        if customer_id:
+            query = query.filter(Transaction.customer_id == customer_id)
+        if product_id:
+            query = query.filter(Transaction.product_id == product_id)
+        transactions_list = (
+            query.order_by(Transaction.timestamp.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+        return [
+            TransactionGet.model_validate(transaction)
+            for transaction in transactions_list
+        ]
+    except (DataError, IntegrityError, OperationalError) as e:
+        logger.error(f"Database error in list_transactions: {type(e).__name__}: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Database error: {type(e).__name__}: {e}"
+        )
+    except Exception as e:
+        logger.exception("Unexpected error in list_transactions")
+        raise HTTPException(
+            status_code=500, detail=f"Unexpected error: {type(e).__name__}: {e}"
+        )
 
 
 def return_transaction(transaction_id: UUID, db: Session) -> TransactionGet:
-    transaction = (
-        db.query(Transaction)
-        .filter(Transaction.transaction_id == transaction_id)
-        .first()
-    )
-    if not transaction:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-    return TransactionGet.model_validate(transaction)
+    try:
+        transaction = (
+            db.query(Transaction)
+            .filter(Transaction.transaction_id == transaction_id)
+            .first()
+        )
+        if not transaction:
+            logger.warning(f"Transaction not found: {transaction_id}")
+            raise HTTPException(status_code=404, detail="Transaction not found")
+        return TransactionGet.model_validate(transaction)
+    except (DataError, IntegrityError, OperationalError) as e:
+        logger.error(f"Database error in return_transaction: {type(e).__name__}: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Database error: {type(e).__name__}: {e}"
+        )
+    except Exception as e:
+        logger.exception("Unexpected error in return_transaction")
+        raise HTTPException(
+            status_code=500, detail=f"Unexpected error: {type(e).__name__}: {e}"
+        )
