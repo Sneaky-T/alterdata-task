@@ -4,8 +4,9 @@ import os
 
 def setup_logging() -> None:
     os.makedirs("logs", exist_ok=True)
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     logging.basicConfig(
-        level=logging.INFO,
+        level=getattr(logging, log_level, logging.INFO),
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
         handlers=[
             logging.StreamHandler(),

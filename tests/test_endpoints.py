@@ -5,21 +5,21 @@ from sqlalchemy.orm import sessionmaker
 from app.db import Base, get_db
 from app.models import transaction
 from app.models.transaction import Transaction
-from app.utils.test_utils import db_content, dirty_csv_content, create_test_tables
+from tests.test_utils import db_content, dirty_csv_content, create_test_tables
 from app.main import app
 import io
 import os
-import time
 from decimal import Decimal
 
-SQLALCHEMY_DATABASE_URL = (
-    "postgresql+psycopg2://admin:secret@localhost:5433/transactions_test_db"
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "postgresql+psycopg2://admin:secret@localhost:5433/transactions_test_db",
 )
 
 
 @pytest.fixture(scope="function")
 def db_session():
-    engine = create_engine(SQLALCHEMY_DATABASE_URL)
+    engine = create_engine(TEST_DATABASE_URL)
 
     create_test_tables(engine)
 
@@ -44,13 +44,26 @@ def client(db_session):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    return TestClient(app)
+    class APIKeyTestClient(TestClient):
+        def request(self, method, url, **kwargs):
+            headers = kwargs.pop("headers", {}) or {}
+            headers.setdefault("x-api-key", "secret-key")
+            return super().request(method, url, headers=headers, **kwargs)
+
+    return APIKeyTestClient(app)
 
 
 def test_root_endpoint(client):
     response = client.get("/")
     assert response.status_code == 200
     assert response.json() == {"message": "Welcome!"}
+
+
+def test_auth_wrong_key(client):
+    response = client.get("/transactions", headers={"x-api-key": "wrong-key"})
+    assert response.status_code == 401
+
+    assert response.json()["detail"] == "Invalid or missing API Key."
 
 
 class TestTransactionsEndpoints:
@@ -88,8 +101,6 @@ class TestCsvUpload:
         response = client.post("/transactions/upload", files=files)
         assert response.status_code == 200
         assert response.json() == {"message": "File uploaded successfully."}
-
-        time.sleep(1)  # wait for background task to finish
 
         log_path = "logs/csv_import.log"
         assert os.path.exists(log_path)
