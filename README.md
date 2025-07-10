@@ -123,7 +123,7 @@ docker-compose exec app python -m pytest tests/test_endpoints.py
 - `db` - Main PostgreSQL database
 - `test_db` - Test PostgreSQL database
 
-## TODO Development cycle
+## Development cycle
 
 - After a bit of research on fastAPI I've decided to choose it as a web framework, despite not actually being familiar with it (only used Django and Flask earlier). What made my mind was how flexible and lightweight it was compared to Django, also auto-docs feature really stole my heart. Pydantic schemas for data validation were also great. As for the database I've chosen PostgreSQL, since I wanted to demonstrate more professional approach. SQLite would be OK for this solution, especially when there is only one table currently, but I wanted the solution to be easily scalable and somewhat production-grade. I would also like to add that I'm more familiar with Django ORM, than with SQLAlchemy. Now, when the task is sent for review I consider my tech stack choice to partially be a mistake, because I didn't have enough expertise, and therefore time to compliment the solution. From another point of view I believe it demonstrates my ability to learn quickly.
 - Database structure is one table only at the moment, which is enough to support current task requirements in my opinion, although if there was more data on customers and products, at least two more tables for each would be applicable and the customer_id, product_id being foreign keys in the transaction table, so there would be some actual relation then. Also at least for some part of the logs, there would be additional tables for them in the db. Especially that currently, there is no mechanism preventing growing log files to enormous sizes.
